@@ -1,38 +1,60 @@
 pragma solidity >=0.4.21 <0.7.0;
 
+import "./Ownable.sol";
+import "./Item.sol";
+
+
 contract ItemManager is Ownable {
-    
-    enum SupplyChainState{Created, Paid, Delivered}
-    
-    struct S_Item{
+    struct S_Item {
         Item _item;
+        ItemManager.SupplyChainSteps _step;
         string _identifier;
-        uint _itemPrice;
-        ItemManager.SupplyChainState _state;
     }
-    mapping(uint => S_Item) public items;
-    uint itemIndex;
-    event SupplyChainStep(uint _index, uint _step, address _item);
-    function createItem(string memory _identifier, uint _price) public onlyOwner{
-        Item item = new Item(this, _price, itemIndex);
-        items[itemIndex]._item = item;
-        items[itemIndex]._identifier = _identifier;
-        items[itemIndex]._itemPrice = _price;
-        items[itemIndex]._state = SupplyChainState.Created;
-        emit SupplyChainStep(itemIndex, uint(items[itemIndex]._state), address(item));
-        itemIndex++;
+    mapping(uint256 => S_Item) public items;
+    uint256 index;
+
+    enum SupplyChainSteps {Created, Paid, Delivered}
+
+    event SupplyChainStep(uint256 _itemIndex, uint256 _step, address _address);
+
+    function createItem(string memory _identifier, uint256 _priceInWei) public {
+        Item item = new Item(this, _priceInWei, index);
+        items[index]._item = item;
+        items[index]._step = SupplyChainSteps.Created;
+        items[index]._identifier = _identifier;
+        emit SupplyChainStep(index, uint256(items[index]._step), address(item));
+        index++;
     }
-    
-    function triggerPayment(uint _index) public payable {
-        require(items[_index]._itemPrice == msg.value, "only full payment accepted");
-        require(items[_index]._state == SupplyChainState.Created, "item is further in the chain"); 
-        emit SupplyChainStep(_index, uint(items[_index]._state), address(items[_index]._item));
-        items[_index]._state = SupplyChainState.Paid;
+
+    function triggerPayment(uint256 _index) public payable {
+        Item item = items[_index]._item;
+        require(
+            address(item) == msg.sender,
+            "Only items are allowed to update themselves"
+        );
+        require(item.priceInWei() == msg.value, "Not fully paid yet");
+        require(
+            items[index]._step == SupplyChainSteps.Created,
+            "Item is further in the supply chain"
+        );
+        items[_index]._step = SupplyChainSteps.Paid;
+        emit SupplyChainStep(
+            _index,
+            uint256(items[_index]._step),
+            address(item)
+        );
     }
-    
-    function triggerDelivery(uint _index) public onlyOwner {
-        require(items[_index]._state == SupplyChainState.Paid, "item must be paid");
-       items[_index]._state = SupplyChainState.Delivered;
-       emit SupplyChainStep(_index, uint(items[_index]._state), address(items[_index]._item));
+
+    function triggerDelivery(uint256 _index) public {
+        require(
+            items[_index]._step == SupplyChainSteps.Paid,
+            "Item is further in the supply chain"
+        );
+        items[_index]._step = SupplyChainSteps.Delivered;
+        emit SupplyChainStep(
+            _index,
+            uint256(items[_index]._step),
+            address(items[_index]._item)
+        );
     }
 }

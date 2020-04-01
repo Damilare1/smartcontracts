@@ -1,5 +1,6 @@
 pragma solidity >=0.4.21 <0.7.0;
 
+
 contract Ownable {
     address payable _owner;
 
@@ -11,8 +12,8 @@ contract Ownable {
         require(isOwner(), "you are not the owner");
         _;
     }
-    
-    function isOwner() public view returns(bool) {
-        return(msg.sender == _owner);
+
+    function isOwner() public view returns (bool) {
+        return (msg.sender == _owner);
     }
 }
